@@ -6,6 +6,21 @@ Attempted code sharing between a NativeScriptVue 3 app and a Vue3 web app.
 
 ATTENTION: working in progress.
 
+# Run
+
+```shell
+
+# run web app
+> ./nsx web 
+
+# run ns app
+> ./nsx native <android | ios>
+
+# run web and ns app
+> ./nsx all <android | ios>
+
+``` 
+
 ## Structure
 
 ./src -> Shared code
@@ -25,7 +40,6 @@ import { createApp } from 'nativescript-vue';
 
 //=web
 import { createApp } from 'vue/dist/vue.esm-bundler'
-//import { createApp } from 'vue';
 //=
 
 import HomeView from './components/HomeView.vue';
@@ -75,10 +89,10 @@ Templates can be identified according to the desired platform
     <div class='page'>
       <div class='action-bar'>
         <span class="font-bold text-lg">Home</span>
-      </div class='action-bar'>
+      </div>
         <span text="my label"/>
-    </div class='page'>
-  </div class='frame'>
+    </div>
+  </div>
 </template>
 
 ``` 
