@@ -1,0 +1,381 @@
+#!/bin/env tclsh
+
+###############################################################################
+ # Modul    : watch.tcl                                                        #
+ # Changed  : 28.02.2008                                                       #
+ # Purpose  : observing directories or files for changes, triggering callback. #
+ # Author   : M.Hoffmann                                                       #
+ # Remarks  : callback(scripts) are evaluated in the scope of the caller.      #
+ # Todo     : stop watching if command/callback returns error/break.           #
+ # History  :                                                                  #
+ # 28.02.08 : v1.0  1st version made out of several of my progs.               #
+ ###############################################################################
+
+package require Tclx
+
+set cntrlc_flag 1
+
+proc trap_ctrl_c {} {
+    puts stdout "Aborting current routine"
+    stop_all
+    exit 0
+}
+
+signal trap SIGINT trap_ctrl_c
+
+namespace eval watch {
+  variable nextHandle 0
+  variable activeIDs
+  array set activeIDs {}
+}
+
+proc watch::fs_changed {obj intv script {lastMTime ""} {handle 0}} {
+  variable nextHandle
+  variable activeIDs      
+  # Att: obj, intv and script are not fully checked by us yet
+  #exec {*}[list touch $obj]
+  catch {file mtime $obj} nowMTime
+  #puts "$obj -> $nowMTime"
+  if [string eq $lastMTime ""] {
+     # new call, no recursion
+     incr nextHandle; # caution: no reuse yet, simply increment each time
+     set handle $nextHandle
+     set lastMTime $nowMTime
+  } elseif {$nowMTime != $lastMTime} {
+     if {[uplevel info procs [lindex $script 0]] != ""} {
+        catch {uplevel $script $obj};# append objectname to callback proc
+     } else {
+        catch {uplevel [string map [list %O $obj] $script]}
+     }
+     set lastMTime $nowMTime
+  }
+ 
+  set activeIDs($handle) \
+   [after $intv [list watch::fs_changed $obj $intv $script $lastMTime $handle]]
+  return $handle
+}
+
+proc watch::fs_change_cancel {handle} {
+  variable activeIDs
+  set script ""
+  catch {
+	 set script [lrange [join [after info $activeIDs($handle)]] 1 end-3]
+	 after cancel $activeIDs($handle)
+	 unset activeIDs($handle)
+  }
+  return $script
+}
+
+proc get_all_files_to_watch {path {files ""}} {
+
+	foreach f [exec {*}[list ls $path]] {	
+		set fpath $path/$f	
+		if {[file isdirectory $fpath]} {
+			set files [get_all_files_to_watch $fpath $files]
+		} else {
+			#puts "::> add file watch $fpath"
+			lappend files $fpath
+		}
+	}
+
+	return $files
+}
+
+proc watcher_start {dir} {
+
+	#set dir [pwd]/$dir
+	set files [get_all_files_to_watch $dir]
+
+	puts "::> watching changes into $dir"
+
+	foreach f $files {
+		puts "::> watching file $f"
+		watch::fs_changed $f 1000 {
+			#puts "file changed %O"
+	      	::on_file_changed %O
+	 	}
+ 	}
+}
+
+proc on_file_changed {f} {
+
+	#puts "::> file changed: $f"
+
+	foreach {env path} {web web/src native native/src} {
+		set parts [lrange [split $f /] 1 end-1]
+	
+		if {$parts != ""} {
+			set parts /[join $parts /]
+		} 
+
+		process_file $env $f $path$parts
+	}
+}
+
+
+
+ #==============================================================================
+
+set web_app_pid {}
+set native_app_pid {}
+
+proc usage {} {
+	puts "Usage: web | native <android | ios> | all <android | ios>"
+}
+
+proc copy_files {env origin destination} {
+	foreach f [glob -dir $origin *] {
+				
+		if {[file isdirectory $f]} {
+			
+			set name [file tail $f]
+			
+			copy_files $env $f  $destination/$name
+
+		} else {
+			process_file $env $f $destination
+		}
+
+	}	
+}
+
+proc process_file {env f destination} {
+
+	set is_native [expr {$env == "native"}]
+	set is_web [expr {$env == "web"}]
+	set extension [file extension $f]
+	set name [file tail $f]
+
+	if {[string match {*\.web\.*} $name]} {
+		if {$is_native} {
+			continue	
+		}
+		set name [regsub {\.web\.} $name {.}]
+	} elseif {[string match {*\.native\.*} $name]} {
+		if {$is_web} {
+			continue	
+		}
+		set name [regsub {\.native\.} $name {.}]
+	}
+
+	puts "::> file copy: $f -> $destination/$name"
+
+	if {$extension == ".vue" || $extension == ".js"} {
+		set fd [open $f r]
+		set lines [split [read $fd] \n]
+
+		set into_block_web false
+		set into_block_native false
+		set block_content {}
+		set contents {}
+		set puts_block false
+		set end_block false
+
+		foreach line $lines {
+
+			#puts $line
+
+			# start template block
+			if {[regexp {<template (\w+)>} [string trim $line] -> type]} {
+				switch $type {
+					web { set into_block_web true}
+					native { set into_block_native true }
+				}
+				lappend block_content $line
+				continue
+			}
+
+
+			# start //= block
+			if {[regexp {//=(\w+)} [string trim $line] -> type]} {
+				switch $type {
+					web { set into_block_web true}
+					native { set into_block_native true }
+				}
+				continue
+			}
+
+			set is_end_block [expr {[string trim $line] == "//=" || [string trim $line] == "</template>"}]
+			set is_block [expr {$into_block_web || $into_block_native}]
+			# end block
+			if {$is_end_block && $is_block} {
+
+				if {[string trim $line] == "</template>"} {
+					lappend block_content $line
+				}
+
+				if {$into_block_web && $is_web} {
+					set puts_block true
+				}
+
+				
+				if {$into_block_native && $is_native} {
+					set puts_block true
+				}
+
+				set end_block true
+			}
+
+			if {$end_block} {
+
+				if {$puts_block} {
+					foreach l $block_content {
+						lappend contents $l
+					}
+				}
+
+				set into_block_web false
+				set into_block_native false
+				set block_content {}
+				set end_block false
+				set puts_block false
+				continue						
+			}
+
+
+			if {$into_block_native || $into_block_web} {
+				lappend block_content $line
+				continue
+			}
+
+			lappend contents $line
+		}
+
+
+		close $fd
+
+		if {![file exists $destination]} {
+			file mkdir $destination
+		}
+
+		set fd [open $destination/$name w+]
+		puts $fd [join $contents \n]
+		close $fd	
+	} else {
+		file copy $f $destination/$name
+	}
+}
+
+proc stop_all {} {
+
+	try {
+		if {$::web_app_pid != ""} {		
+	        exec {*}[list kill $::web_app_pid]
+		}
+	    
+		if {$::native_app_pid != ""} {		
+	        exec {*}[list kill $::native_app_pid]
+		}
+	} on error err {
+		puts "kill error: $err"
+		exit -1
+	}
+
+}
+
+proc handle_logs {app_name channel} {
+    if {[gets $channel line] >= 0} {
+        puts "$line"
+    } elseif [eof $channel] {
+        puts ":: \[$app_name] ::> closed"
+        close $channel
+    }
+}
+
+proc start_web {} {
+	file delete -force web/src/components
+	file mkdir web/src/components
+	file delete web/src/main.js
+	
+	copy_files web src web/src
+
+	set cmd [list env FORCE_COLOR=1 npm run serve]
+	puts "::> run $cmd"
+	cd web 
+	set fd [open |$cmd {RDWR NOCTTY NONBLOCK}]
+	fconfigure $fd -blocking 0 -buffering none
+	flush $fd
+	fileevent $fd readable [list handle_logs web $fd]
+	set ::web_app_pid [pid $fd]
+	cd ..
+}
+
+proc start_native {platform args} {
+	file delete -force native/src/components
+	file mkdir native/src/components
+	file delete native/src/main.js
+	copy_files native src native/src
+
+	set cmd [list ns run $platform]
+	puts "::> run $cmd"
+	cd native 
+	set fd [open |$cmd {RDWR NOCTTY NONBLOCK}]
+	fconfigure $fd -blocking 0 -buffering none
+	flush $fd
+	fileevent $fd readable [list handle_logs native $fd]
+	set ::web_app_pid [pid $fd]
+	cd ..
+}
+
+
+proc main {argc argv} {
+
+	if {$argc == 0} {
+		usage
+		exit -1
+	}
+
+	set platform {}
+	set args {}
+
+	if {$argc > 1} {
+		set platform [lindex $argv 1]
+		if {$argc > 2} {
+			set args [lrange $args 2 end]
+		}
+	}
+
+
+
+	switch [lindex $argv 0] {
+		web {
+			start_web
+			watcher_start src
+		}
+		native {
+
+			if {[lsearch [list android ios] $platform] == -1} {
+				usage
+				exit -1
+			}
+
+			start_native $platform $args
+			watcher_start src
+
+		}
+		all {
+			if {[lsearch [list android ios] $platform] == -1} {
+				usage
+				exit -1
+			}
+
+			start_web
+			start_native $platform $args
+			watcher_start src
+
+		}
+		default {
+			usage
+			exit -1
+		}
+	}
+
+}
+
+
+main $::argc $::argv
+
+
+puts "::> run forever"
+
+vwait forever
