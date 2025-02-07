@@ -132,3 +132,6 @@ dist
 
 *.lock
 *-lock.json
+
+web/src
+native/src

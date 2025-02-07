@@ -1,27 +1,31 @@
-<script setup>
+<script lang="js" setup>
 
-//=native
-import {
-  ref,
-  computed,
-  onMounted,
-  onUnmounted,  
-} from 'nativescript-vue';
-import {Label, Frame, Page, ActionBar, GridLayout} from '@nativescript/core'
-//=
 
-//=web
+
 import { 
   ref, 
   computed, 
   onMounted, 
   onUnmounted,
-} from 'vue';
-//=
+} from './nscs/vue';
+
+import { 
+  Label,
+  Frame,
+  Page,
+  ActionBar,
+  GridLayout,
+} from './nscs/ui';
+
+
+import {multiply} from '../scala/calcule'
+import {ScalaComponent,ScalaComponent2} from '../scala/component'
+////
+console.log("multiply = " + multiply(1,1));
 
 const counter = ref(0);
 const message = computed(() => {
-  return `Blank {N}-Vue app: ${counter.value}`;
+  return `Blank {N}-Vue app: ${counter.value} =)`;
 });
 
 function logMessage() {
@@ -40,61 +44,35 @@ onUnmounted(() => {
 });
 
 
-//=web
-const MyLabel = {
-  props: ['text', 'cls'],
-  setup() {
-    console.log(`MyLabel setup`)
-  },
-  template: "<span :class=\"cls\">{{text}}!!</span>",
-}
-const MyFrame = {
-  template: "<div><slot></slot></div>"
-}
-const MyPage = {
-  template: "<div><slot></slot></div>"
-}
-const MyActionBar = {
-  template: "<div style='height: 50px; width: 100%; background-color: blue;'><slot></slot></div>"
-}
-const MyGridLayout = {
-  props: ['rows', 'cls'],
-  template: "<div :class=\"cls\"><slot></slot></div>"
-}
-//=
+let SComponent1 = new ScalaComponent()
+let SComponent = ScalaComponent2
 
-
-//=native
-const MyLabel = Label
-const MyFrame = Frame
-const MyPage = Page
-const MyActionBar = ActionBar
-const MyGridLayout = GridLayout
-//=
-
+console.log(ScalaComponent2)
 
 </script>
 
 
 <template>
-  <MyFrame>
-    <MyPage>
-      <MyActionBar>
-        <MyLabel text="Home" class="font-bold text-lg" cls="font-bold text-lg"/>
-      </MyActionBar>
+  <Frame>
+    <Page>
+      <ActionBar>
+        <Label text="Home" class="font-bold text-lg" cls="font-bold text-lg"/>
+      </ActionBar>
 
-      <MyGridLayout rows="auto, *" class="px-4" cls="px-4">
-        <MyLabel text="generic label!"/>
-        <MyLabel
+      <GridLayout rows="auto, *" class="px-4" cls="px-4">
+        <Label text="generic label!"/>
+        <SComponent text="yeahh!!"/>
+        <SComponent1 text="uwooooo" />
+        <Label
           row="1"
           class="text-xl align-middle text-center text-gray-500"
           :text="message"
           @tap="logMessage"
         />
 
-      </MyGridLayout>
-    </MyPage>
-  </MyFrame>
+      </GridLayout>
+    </Page>
+  </Frame>
 </template>
 
 <style>
