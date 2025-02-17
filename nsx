@@ -170,11 +170,22 @@ proc nsx::on_file_changed {f dir mapTo} {
 
 
 proc nsx::usage {} {
-	puts "Usage: web | native <android | ios> | all <android | ios>"
+	puts ""
+	puts "Usage: "
+	puts ""
+	puts "./nsx web | native <platforma> | all <platforma>"
+	puts ""
+	puts "Example:"
+	puts " ./nsx web"
+	puts " ./nsx native android"
+	puts " ./nsx native ios"
+	puts " ./nsx all android"
+	puts " ./nsx all ios"
 }
 
 proc nsx::copy_files {env origin destination} {
-	foreach f [glob -dir $origin *] {
+	puts "::> $origin"
+	foreach f [glob -nocomplain -dir $origin *] {
 				
 		if {[file isdirectory $f]} {
 			
@@ -376,7 +387,7 @@ proc nsx::start_native {platform args} {
 proc main {argc argv} {
 
 	if {$argc == 0} {
-		usage
+		nsx::usage
 		exit -1
 	}
 

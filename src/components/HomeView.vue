@@ -19,7 +19,10 @@ import {
 
 
 import {multiply} from '../scala/calcule'
-import {ScalaComponent,ScalaComponent2} from '../scala/component'
+import {ScalaComponent,ScalaComponent2, ScalaVComponent1} from '../scala/component'
+
+import LoginView from '../scala/LoginView'
+
 ////
 console.log("multiply = " + multiply(1,1));
 
@@ -47,7 +50,6 @@ onUnmounted(() => {
 let SComponent1 = new ScalaComponent()
 let SComponent = ScalaComponent2
 
-console.log(ScalaComponent2)
 
 </script>
 
@@ -63,12 +65,15 @@ console.log(ScalaComponent2)
         <Label text="generic label!"/>
         <SComponent text="yeahh!!"/>
         <SComponent1 text="uwooooo" />
+        <ScalaVComponent1 text="v component!" />
         <Label
           row="1"
           class="text-xl align-middle text-center text-gray-500"
           :text="message"
           @tap="logMessage"
         />
+
+        <LoginView propText="prop value"/>
 
       </GridLayout>
     </Page>

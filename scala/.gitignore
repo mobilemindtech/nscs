@@ -32,3 +32,4 @@ metals.sbt
 .idea
 .idea_modules
 /.worksheet/
+./dist

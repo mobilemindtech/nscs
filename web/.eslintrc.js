@@ -7,6 +7,7 @@ module.exports = {
   ],
   rules: {
     // override/add rules settings here, such as:
-    'vue/no-unused-vars': 'off'
+    'vue/no-unused-vars': 'off',
+    'vue/no-ref-as-operand': 'off',
   }
 }

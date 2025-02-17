@@ -2,6 +2,7 @@
 {
 	"watch": {
 		"src": ["native:native/src", "web:web/src"],
+		"assets": ["native:native/src/assets", "web:web/public/assets"],
 		"scala/dist": ["native:native/src/scala", "web:web/src/scala"]
 	}
 }
